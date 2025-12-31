@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TampermonkeyScriptHub - 脚本管理中心</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;       
+            --primary-light: #eff6ff;
+            --success: #10b981;
+            --danger: #ef4444;
+            --bg-body: #fbfcfd;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --radius-main: 12px;
+            --border: #e2e8f0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', "Microsoft YaHei", sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; padding-bottom: 50px; }
+
+        .top-bar {
+            background: white; border-bottom: 1px solid var(--border);
+            padding: 16px 5%; display: flex; justify-content: center; align-items: center;
+            position: sticky; top: 0; z-index: 100;
+        }
+
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.2rem; letter-spacing: -0.5px; }
+        .logo-box { width: 32px; height: 32px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; }
+
+        .container { max-width: 900px; margin: 32px auto; width: 90%; }
+
+        .nav-tabs { display: flex; gap: 8px; margin-bottom: 32px; justify-content: center; }
+        .nav-btn {
+            padding: 10px 24px; border-radius: 99px; border: 1px solid transparent;
+            background: transparent; color: var(--text-muted); font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: 0.2s; opacity: 0.4; pointer-events: none;
+        }
+        .nav-btn.enabled { opacity: 1; pointer-events: auto; }
+        .nav-btn.active { background: var(--primary-light); color: var(--primary); }
+        .nav-btn:hover:not(.active) { background: #f1f5f9; }
+
+        .script-card {
+            background: white; border: 1px solid var(--border); border-radius: var(--radius-main);
+            padding: 24px; margin-bottom: 20px; transition: all 0.2s;
+        }
+        .script-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .version-tag { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 6px; }
+        .meta-info { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+        .code-preview {
+            background: #f8fafc; border: 1px solid #f1f5f9; padding: 14px; border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #64748b;
+            max-height: 70px; overflow: hidden; margin-bottom: 24px; position: relative;
+        }
+
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-outline { background: white; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-danger-text { background: transparent; color: var(--danger); font-size: 13px; }
+        .btn-danger-text:hover { background: #fff1f2; border-radius: 6px; }
+
+        .auth-mask { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+        .auth-card { text-align: center; width: 100%; max-width: 320px; }
+        .input-auth { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border); font-size: 16px; text-align: center; margin: 24px 0 12px; outline: none; }
+
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            padding: 12px 24px; border-radius: 12px; background: #1e293b; color: white;
+            font-size: 14px; z-index: 2000; display: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast" class="toast">操作成功</div>
+
+    <div id="auth-modal" class="auth-mask">
+        <div class="auth-card">
+            <div class="logo-box" style="margin: 0 auto 20px;">T</div>
+            <h3 style="font-size: 20px;">TampermonkeyScriptHub</h3>
+            <input type="password" id="admin-password" class="input-auth" placeholder="请输入管理密码">
+            <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="handleAuth()">进入控制台</button>
+            <p id="auth-error" style="color: var(--danger); font-size: 13px; margin-top: 12px; display: none;">密码验证失败</p>
+        </div>
+    </div>
+
+    <header class="top-bar">
+        <div class="logo"><div class="logo-box">T</div>TampermonkeyScriptHub</div>
+    </header>
+
+    <main class="container">
+        <div class="nav-tabs">
+            <button class="nav-btn active" data-tab="manage">脚本库</button>
+            <button class="nav-btn" data-tab="upload">本地上传</button>
+            <button class="nav-btn" data-tab="import">远程导入</button>
+        </div>
+
+        <div id="manage" class="tab-pane active" style="display: block;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="font-size: 18px; font-weight: 700;">已托管脚本</h2>
+                <button class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="loadScriptList()">刷新列表</button>
+            </div>
+            <div id="script-list">
+                <p style="text-align: center; color: var(--text-muted); padding: 50px;">正在加载...</p>
+            </div>
+        </div>
+
+        <div id="upload" class="tab-pane" style="display: none;">
+            <div class="script-card">
+                <h2 style="font-size: 17px; margin-bottom: 20px;">从文件上传</h2>
+                <div style="border: 2px dashed var(--border); padding: 40px; border-radius: 12px; text-align: center; background: #fafafa;">
+                    <input type="file" id="script-file" accept=".user.js">
+                </div>
+                <button class="btn btn-primary" style="margin-top: 24px; width: 100%; justify-content: center;" onclick="handleUpload()">确认上传并保存</button>
+            </div>
+        </div>
+
+        <div id="import" class="tab-pane" style="display: none;">
+            <div class="script-card">
+                <h2 style="font-size: 17px; margin-bottom: 20px;">远程链接导入</h2>
+                <input type="text" id="remote-url" class="input-auth" style="text-align: left; margin: 0 0 20px;" placeholder="https://example.com/script.user.js">
+                <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="handleImport()">立即导入脚本</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 注意：请替换为您的实际 Worker 域名
+        const WORKER_BASE_URL = 'https://your-app-name.your-subdomain.workers.dev';
+        let ADMIN_PASSWORD = '';
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2500);
+        }
+
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).style.display = 'block';
+            }
+        });
+
+        async function handleAuth() {
+            const pwd = document.getElementById('admin-password').value;
+            try {
+                const res = await fetch(`${WORKER_BASE_URL}/api/scripts?password=${encodeURIComponent(pwd)}`);
+                const data = await res.json();
+                if (data.code === 200) {
+                    ADMIN_PASSWORD = pwd;
+                    document.getElementById('auth-modal').style.display = 'none';
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.add('enabled'));
+                    loadScriptList();
+                } else {
+                    document.getElementById('auth-error').style.display = 'block';
+                }
+            } catch (e) { alert("无法连接到 API 服务"); }
+        }
+
+        async function apiCall(path, method, body = null, isFile = false) {
+            const headers = { 'X-Admin-Password': ADMIN_PASSWORD };
+            if (!isFile) headers['Content-Type'] = 'application/json';
+            const res = await fetch(`${WORKER_BASE_URL}${path}`, {
+                method, headers,
+                body: body ? (isFile ? body : JSON.stringify(body)) : null
+            });
+            return res.json();
+        }
+
+        async function loadScriptList() {
+            const list = document.getElementById('script-list');
+            list.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 50px;">同步中...</p>';
+            try {
+                const res = await fetch(`${WORKER_BASE_URL}/api/scripts?password=${encodeURIComponent(ADMIN_PASSWORD)}`);
+                const result = await res.json();
+                if (result.code === 200 && result.data.length > 0) {
+                    list.innerHTML = '';
+                    result.data.forEach(s => {
+                        const card = document.createElement('div');
+                        card.className = 'script-card';
+                        card.innerHTML = `
+                            <div class="card-header">
+                                <h3 style="font-size: 16px;">${s.name}</h3>
+                                <span class="version-tag">v${s.version}</span>
+                            </div>
+                            <div class="meta-info">
+                                <span>👤 ${s.author}</span>
+                                <span>🕒 ${new Date(s.uploadTime).toLocaleDateString()}</span>
+                            </div>
+                            <div class="code-preview">${s.content.substring(0, 200)}...</div>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <button class="btn btn-primary" onclick="window.open('${s.rawScriptUrl}', '_blank')">安装脚本</button>
+                                <button class="btn btn-outline" onclick="copySource('${s.id}')">复制</button>
+                                <button class="btn btn-danger-text" onclick="deleteScript('${s.id}')">删除</button>
+                            </div>
+                        `;
+                        list.appendChild(card);
+                    });
+                } else {
+                    list.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 50px;">暂无脚本</p>';
+                }
+            } catch (e) { showToast("加载失败"); }
+        }
+
+        async function handleUpload() {
+            const file = document.getElementById('script-file').files[0];
+            if (!file) return showToast("请选择文件");
+            const fd = new FormData(); fd.append('scriptFile', file);
+            const res = await apiCall('/api/scripts/upload', 'POST', fd, true);
+            showToast(res.message);
+            if(res.code === 200) loadScriptList();
+        }
+
+        async function handleImport() {
+            const url = document.getElementById('remote-url').value;
+            if (!url) return showToast("请输入链接");
+            const res = await apiCall('/api/scripts/import', 'POST', { remoteUrl: url });
+            showToast(res.message);
+            if(res.code === 200) loadScriptList();
+        }
+
+        async function deleteScript(id) {
+            if(!confirm("确定删除吗？")) return;
+            const res = await apiCall(`/api/scripts/${id}`, 'DELETE');
+            showToast(res.message);
+            loadScriptList();
+        }
+
+        async function copySource(id) {
+            const res = await fetch(`${WORKER_BASE_URL}/api/scripts?password=${encodeURIComponent(ADMIN_PASSWORD)}`);
+            const data = await res.json();
+            const s = data.data.find(x => x.id === id);
+            navigator.clipboard.writeText(s.content);
+            showToast("已复制源码");
+        }
+    </script>
+</body>
+</html>
